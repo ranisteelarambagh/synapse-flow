@@ -5,6 +5,7 @@ export type NodeStatus = 'idle' | 'running' | 'success' | 'error';
 export type NodeCategory = 'ai' | 'tool' | 'logic' | 'io';
 
 export interface NodeData {
+  [key: string]: unknown;
   label: string;
   description?: string;
   category: NodeCategory;
