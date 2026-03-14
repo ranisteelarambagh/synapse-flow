@@ -7,6 +7,7 @@ import {
   useNodesState,
   useEdgesState,
   addEdge,
+  ConnectionLineType,
   type Connection,
   type Node,
   BackgroundVariant,
