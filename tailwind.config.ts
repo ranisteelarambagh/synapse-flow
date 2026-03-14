@@ -13,6 +13,11 @@ export default {
       },
     },
     extend: {
+      fontFamily: {
+        display: ["var(--font-display)"],
+        ui: ["var(--font-ui)"],
+        mono: ["var(--font-mono)"],
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
@@ -57,6 +62,21 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+        // Synapse tokens
+        "syn-void": "hsl(var(--bg-void))",
+        "syn-surface": "hsl(var(--bg-surface))",
+        "syn-raised": "hsl(var(--bg-raised))",
+        "syn-hover": "hsl(var(--bg-hover))",
+        "syn-border": "hsl(var(--border-subtle))",
+        "syn-border-active": "hsl(var(--border-active))",
+        "syn-violet": "hsl(var(--violet))",
+        "syn-teal": "hsl(var(--teal))",
+        "syn-red": "hsl(var(--red))",
+        "syn-amber": "hsl(var(--amber))",
+        "syn-text": "hsl(var(--text-primary))",
+        "syn-text-secondary": "hsl(var(--text-secondary))",
+        "syn-text-muted": "hsl(var(--text-muted))",
+        "syn-text-code": "hsl(var(--text-code))",
       },
       borderRadius: {
         lg: "var(--radius)",
@@ -65,20 +85,12 @@ export default {
       },
       keyframes: {
         "accordion-down": {
-          from: {
-            height: "0",
-          },
-          to: {
-            height: "var(--radix-accordion-content-height)",
-          },
+          from: { height: "0" },
+          to: { height: "var(--radix-accordion-content-height)" },
         },
         "accordion-up": {
-          from: {
-            height: "var(--radix-accordion-content-height)",
-          },
-          to: {
-            height: "0",
-          },
+          from: { height: "var(--radix-accordion-content-height)" },
+          to: { height: "0" },
         },
       },
       animation: {
