@@ -85,6 +85,21 @@
   code, pre, .font-mono {
     font-family: var(--font-mono);
   }
+
+  /* Remove browser default focus rings and use custom */
+  *:focus {
+    outline: none;
+  }
+
+  *:focus-visible {
+    outline: 2px solid hsl(var(--violet));
+    outline-offset: 2px;
+  }
+
+  /* Remove browser default selection colors globally */
+  ::selection {
+    background: rgba(108, 99, 255, 0.25);
+  }
 }
 
 /* Synapse Animations */
