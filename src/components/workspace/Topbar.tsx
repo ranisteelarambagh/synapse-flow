@@ -94,7 +94,7 @@ export default function Topbar() {
             <div
               key={c.id}
               className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold text-foreground ring-2 animate-presence-in"
-              style={{ backgroundColor: c.color + '33', ringColor: c.color }}
+              style={{ backgroundColor: c.color + '33', boxShadow: `0 0 0 2px ${c.color}` }}
               title={`${c.name} · ${c.activeNodeId ? `editing ${c.activeNodeId}` : 'idle'}`}
             >
               {c.name.split(' ').map(n => n[0]).join('')}

@@ -115,7 +115,7 @@ export default function Canvas() {
         onDragOver={onDragOver}
         onDrop={onDrop}
         nodeTypes={nodeTypes}
-        connectionLineType="smoothstep"
+        connectionLineType={ConnectionLineType.SmoothStep}
         fitView
         minZoom={0.25}
         maxZoom={2.5}
