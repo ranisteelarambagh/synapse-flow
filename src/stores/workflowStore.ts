@@ -47,6 +47,7 @@ interface WorkflowStore {
   executionResults: Record<string, NodeResult>;
   comments: Comment[];
   workspaceName: string;
+  workflowDescription: string;
 
   setNodes: (nodes: Node<NodeData>[]) => void;
   setEdges: (edges: Edge[]) => void;
@@ -56,6 +57,7 @@ interface WorkflowStore {
   setExecutionResults: (r: Record<string, NodeResult>) => void;
   setNodeStatus: (nodeId: string, status: NodeStatus) => void;
   setWorkspaceName: (name: string) => void;
+  setWorkflowDescription: (desc: string) => void;
   addComment: (comment: Comment) => void;
   updateNodeData: (nodeId: string, data: Partial<NodeData>) => void;
 }
@@ -79,6 +81,7 @@ export const useWorkflowStore = create<WorkflowStore>((set) => ({
     },
   ],
   workspaceName: 'AI Research Pipeline',
+  workflowDescription: '',
 
   setNodes: (nodes) => set({ nodes, unsavedChanges: true }),
   setEdges: (edges) => set({ edges, unsavedChanges: true }),
@@ -93,6 +96,7 @@ export const useWorkflowStore = create<WorkflowStore>((set) => ({
       ),
     })),
   setWorkspaceName: (name) => set({ workspaceName: name, unsavedChanges: true }),
+  setWorkflowDescription: (desc) => set({ workflowDescription: desc, unsavedChanges: true }),
   addComment: (comment) => set((state) => ({ comments: [...state.comments, comment] })),
   updateNodeData: (nodeId, data) =>
     set((state) => ({

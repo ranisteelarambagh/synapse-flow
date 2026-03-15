@@ -5,21 +5,145 @@ import { useUIStore } from '@/stores/uiStore';
 import { useExecutionStore } from '@/stores/executionStore';
 import type { Node } from '@xyflow/react';
 import { Slider } from '@/components/ui/slider';
-import { Switch } from '@/components/ui/switch';
+import { ChevronDown, X } from 'lucide-react';
 
-// --- Inspector Tab ---
+const MODELS = [
+  { value: 'llama-3.3-70b', label: 'llama-3.3-70b · Groq · FREE' },
+  { value: 'gemini-2.0-flash', label: 'gemini-2.0-flash · Google · FREE' },
+  { value: 'mistral-7b', label: 'mistral-7b · Mistral · FREE' },
+  { value: 'gpt-4o', label: 'gpt-4o · OpenAI · PAID' },
+  { value: 'claude-3-5-sonnet', label: 'claude-3-5-sonnet · Anthropic · PAID' },
+];
+
+function ModelDropdown({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
+
+  const filtered = MODELS.filter(m => m.label.toLowerCase().includes(search.toLowerCase()));
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setOpen(!open)}
+        className="w-full h-8 px-3 text-xs font-ui bg-syn-raised border border-syn-border rounded-md text-foreground flex items-center justify-between hover:border-syn-border-active transition-all"
+      >
+        <span>{MODELS.find(m => m.value === value)?.label || value}</span>
+        <ChevronDown className={cn('w-3 h-3 transition-transform', open && 'rotate-180')} />
+      </button>
+
+      {open && (
+        <div className="absolute top-full left-0 right-0 mt-1 z-50 bg-syn-raised border border-syn-border rounded-md shadow-lg max-h-60 overflow-y-auto">
+          <div className="p-2 sticky top-0 bg-syn-raised border-b border-syn-border">
+            <input
+              autoFocus
+              placeholder="Search models..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full h-7 px-2 text-xs font-ui bg-syn-hover border border-syn-border rounded text-foreground focus:outline-none focus:border-syn-violet"
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') setOpen(false);
+              }}
+            />
+          </div>
+          {filtered.map(model => (
+            <button
+              key={model.value}
+              onClick={() => {
+                onChange(model.value);
+                setOpen(false);
+                setSearch('');
+              }}
+              className={cn(
+                'w-full px-3 py-2 text-left text-xs font-ui hover:bg-syn-hover transition-colors',
+                value === model.value && 'bg-syn-violet/20 text-syn-violet'
+              )}
+            >
+              {model.label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {open && (
+        <div
+          className="fixed inset-0 z-40"
+          onClick={() => setOpen(false)}
+        />
+      )}
+    </div>
+  );
+}
+
 function InspectorTab() {
-  const { nodes, selectedNodeId, updateNodeData } = useWorkflowStore();
+  const { nodes, selectedNodeId, updateNodeData, workspaceName, setWorkspaceName, workflowDescription, setWorkflowDescription } = useWorkflowStore();
+  const [workflowEditing, setWorkflowEditing] = useState(false);
+  const [workflowEditValue, setWorkflowEditValue] = useState(workspaceName);
+
   const selectedNode = useMemo(
     () => (nodes as Node<NodeData>[]).find((n) => n.id === selectedNodeId),
     [nodes, selectedNodeId]
   );
 
+  // When no node selected, show workflow metadata
   if (!selectedNode) {
     return (
-      <div className="p-4 text-sm text-syn-text-secondary font-ui">
-        <p className="text-syn-text-muted mb-2 text-xs font-mono">No node selected</p>
-        <p>Select a node on the canvas to view and edit its configuration.</p>
+      <div className="p-4 space-y-4 overflow-y-auto h-full">
+        {/* Workflow name */}
+        <div>
+          <span className="text-xs font-ui text-syn-text-secondary mb-2 block">Workflow Name</span>
+          {workflowEditing ? (
+            <input
+              autoFocus
+              value={workflowEditValue}
+              onChange={(e) => setWorkflowEditValue(e.target.value)}
+              onBlur={() => {
+                setWorkflowEditing(false);
+                if (workflowEditValue.trim()) setWorkspaceName(workflowEditValue.trim());
+                else setWorkflowEditValue(workspaceName);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  setWorkflowEditing(false);
+                  if (workflowEditValue.trim()) setWorkspaceName(workflowEditValue.trim());
+                }
+              }}
+              className="w-full h-8 px-3 text-sm font-ui bg-syn-raised border border-syn-border-active rounded-md text-foreground focus:outline-none caret-syn-violet"
+            />
+          ) : (
+            <button
+              onDoubleClick={() => {
+                setWorkflowEditing(true);
+                setWorkflowEditValue(workspaceName);
+              }}
+              className="w-full h-8 px-3 text-sm font-ui text-left text-foreground hover:bg-syn-hover rounded-md transition-all"
+            >
+              {workspaceName}
+            </button>
+          )}
+        </div>
+
+        {/* Description */}
+        <div>
+          <span className="text-xs font-ui text-syn-text-secondary mb-2 block">Description</span>
+          <textarea
+            value={workflowDescription}
+            onChange={(e) => setWorkflowDescription(e.target.value)}
+            placeholder="Describe what this workflow does..."
+            className="w-full px-3 py-2 text-xs font-ui bg-syn-raised border border-syn-border rounded-md text-foreground resize-y min-h-[80px] max-h-[200px] focus:outline-none focus:border-syn-violet transition-all"
+          />
+        </div>
+
+        {/* Stats */}
+        <div className="pt-4 border-t border-syn-border">
+          <span className="text-[11px] font-ui text-syn-text-secondary">
+            {nodes.length} nodes · {nodes.length - 1} edges · 0 runs
+          </span>
+        </div>
+
+        {/* Last saved */}
+        <div className="text-[10px] font-ui text-syn-text-muted">
+          Last saved: just now
+        </div>
       </div>
     );
   }
@@ -34,7 +158,13 @@ function InspectorTab() {
           <span className="text-lg">{d.icon}</span>
           <span className="text-base font-display font-medium text-foreground">{d.label}</span>
         </div>
-        <p className="text-[10px] font-mono text-syn-text-muted">{selectedNode.id}</p>
+        <button
+          onClick={() => navigator.clipboard.writeText(`node_${selectedNode.id.substring(0, 6)}`)}
+          className="text-[10px] font-mono text-syn-text-muted hover:text-syn-text-secondary transition-colors"
+          title="Click to copy"
+        >
+          node_{selectedNode.id.substring(0, 6)}
+        </button>
       </div>
 
       {/* Fields */}
@@ -50,7 +180,12 @@ function InspectorTab() {
 
         {d.config.systemPrompt !== undefined && (
           <label className="block">
-            <span className="text-xs font-ui text-syn-text-secondary mb-1 block">System Prompt</span>
+            <div className="flex items-baseline justify-between mb-1">
+              <span className="text-xs font-ui text-syn-text-secondary">System Prompt</span>
+              <span className="text-[10px] font-mono text-syn-text-muted">
+                {d.config.systemPrompt?.length || 0} / ∞
+              </span>
+            </div>
             <textarea
               value={d.config.systemPrompt || ''}
               onChange={(e) => updateNodeData(selectedNode.id, { config: { ...d.config, systemPrompt: e.target.value } })}
@@ -63,17 +198,10 @@ function InspectorTab() {
         {d.config.model !== undefined && (
           <label className="block">
             <span className="text-xs font-ui text-syn-text-secondary mb-1 block">Model</span>
-            <select
+            <ModelDropdown
               value={d.config.model}
-              onChange={(e) => updateNodeData(selectedNode.id, { config: { ...d.config, model: e.target.value } })}
-              className="w-full h-8 px-3 text-xs font-ui bg-syn-raised border border-syn-border rounded-md text-foreground focus:outline-none focus:border-syn-violet transition-all"
-            >
-              <option value="llama-3.3-70b">llama-3.3-70b · Groq · FREE</option>
-              <option value="gemini-2.0-flash">gemini-2.0-flash · Google · FREE</option>
-              <option value="mistral-7b">mistral-7b · Mistral · FREE</option>
-              <option value="gpt-4o">gpt-4o · OpenAI · PAID</option>
-              <option value="claude-3-5-sonnet">claude-3-5-sonnet · Anthropic · PAID</option>
-            </select>
+              onChange={(v) => updateNodeData(selectedNode.id, { config: { ...d.config, model: v } })}
+            />
           </label>
         )}
 
@@ -125,16 +253,22 @@ function InspectorTab() {
         {d.config.method !== undefined && (
           <label className="block">
             <span className="text-xs font-ui text-syn-text-secondary mb-1 block">Method</span>
-            <select
-              value={d.config.method}
-              onChange={(e) => updateNodeData(selectedNode.id, { config: { ...d.config, method: e.target.value } })}
-              className="w-full h-8 px-3 text-xs font-ui bg-syn-raised border border-syn-border rounded-md text-foreground focus:outline-none focus:border-syn-violet transition-all"
-            >
-              <option>GET</option>
-              <option>POST</option>
-              <option>PUT</option>
-              <option>DELETE</option>
-            </select>
+            <div className="grid grid-cols-4 gap-2">
+              {['GET', 'POST', 'PUT', 'DELETE'].map(method => (
+                <button
+                  key={method}
+                  onClick={() => updateNodeData(selectedNode.id, { config: { ...d.config, method } })}
+                  className={cn(
+                    'h-8 rounded-md text-xs font-ui transition-all',
+                    d.config.method === method
+                      ? 'bg-syn-violet text-foreground'
+                      : 'bg-syn-raised border border-syn-border text-syn-text-secondary hover:bg-syn-hover'
+                  )}
+                >
+                  {method}
+                </button>
+              ))}
+            </div>
           </label>
         )}
       </div>
@@ -146,18 +280,10 @@ function InspectorTab() {
   );
 }
 
-// --- AI Debugger Tab ---
 function DebuggerTab() {
   const { timeline } = useExecutionStore();
   const { executionResults } = useWorkflowStore();
   const [expandedNode, setExpandedNode] = useState<string | null>(null);
-
-  const statusColors: Record<string, string> = {
-    success: 'bg-syn-teal text-syn-teal',
-    error: 'bg-syn-red text-syn-red',
-    running: 'bg-syn-violet text-syn-violet',
-    skipped: 'bg-syn-text-muted text-syn-text-muted',
-  };
 
   return (
     <div className="h-full overflow-y-auto">
@@ -172,21 +298,29 @@ function DebuggerTab() {
 
       {/* Timeline */}
       <div className="flex gap-1 p-3 overflow-x-auto">
-        {timeline.map((step, i) => (
+        {timeline.map((step) => (
           <button
             key={step.nodeId}
             onClick={() => setExpandedNode(step.nodeId === expandedNode ? null : step.nodeId)}
             className={cn(
-              'shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[11px] font-ui border transition-all',
+              'shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[11px] font-ui border transition-all relative overflow-hidden',
               step.status === 'success' && 'border-syn-teal/30 bg-syn-teal/10 text-syn-teal',
               step.status === 'error' && 'border-syn-red/30 bg-syn-red/10 text-syn-red',
               step.status === 'running' && 'border-syn-violet/30 bg-syn-violet/10 text-syn-violet',
               step.status === 'skipped' && 'border-syn-border bg-syn-raised text-syn-text-muted',
             )}
           >
-            <span>{step.icon}</span>
-            <span>{step.nodeName}</span>
-            <span className="text-[9px] opacity-70">{step.duration}ms</span>
+            {step.status === 'running' && (
+              <div
+                className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
+                style={{
+                  animation: 'pillFill 1s ease-in-out forwards',
+                }}
+              />
+            )}
+            <span className="relative z-10">{step.icon}</span>
+            <span className="relative z-10">{step.nodeName}</span>
+            <span className="text-[9px] opacity-70 relative z-10">{step.duration}ms</span>
           </button>
         ))}
       </div>
@@ -199,48 +333,35 @@ function DebuggerTab() {
           const isOpen = expandedNode === step.nodeId;
 
           return (
-            <div key={step.nodeId} className="border border-syn-border rounded-lg overflow-hidden">
-              <button
-                onClick={() => setExpandedNode(isOpen ? null : step.nodeId)}
-                className="w-full flex items-center gap-2 p-2.5 text-left hover:bg-syn-hover transition-all"
-              >
-                <span className="text-xs">{step.icon}</span>
-                <span className="text-xs font-display font-medium text-foreground flex-1">{step.nodeName}</span>
-                <span className={cn('text-[10px] px-1.5 py-0.5 rounded', statusColors[step.status]?.split(' ')[0] + '/20', statusColors[step.status]?.split(' ')[1])}>
-                  {step.status}
+            <button
+              key={step.nodeId}
+              onClick={() => setExpandedNode(isOpen ? null : step.nodeId)}
+              className={cn(
+                'w-full text-left p-3 rounded-md border transition-all',
+                step.status === 'success' && 'border-syn-teal/30 bg-syn-teal/5 hover:bg-syn-teal/10',
+                step.status === 'error' && 'border-syn-red/30 bg-syn-red/5 hover:bg-syn-red/10'
+              )}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-display">{step.nodeName}</span>
+                <span className={cn('text-[10px] font-mono', step.status === 'success' ? 'text-syn-teal' : 'text-syn-red')}>
+                  {step.duration}ms
                 </span>
-                <span className="text-[10px] text-syn-text-muted">{step.duration}ms</span>
-              </button>
+              </div>
 
-              {isOpen && (
-                <div className="border-t border-syn-border p-3 space-y-2 animate-in slide-in-from-top-1 duration-200">
-                  {result.input && (
-                    <div>
-                      <span className="text-[9px] uppercase tracking-wider text-syn-text-muted font-ui">Input</span>
-                      <pre className="text-[11px] font-mono text-syn-text-code bg-syn-void p-2 rounded mt-1 overflow-x-auto">
-                        {JSON.stringify(result.input, null, 2)}
-                      </pre>
-                    </div>
-                  )}
-                  {result.output && (
-                    <div>
-                      <span className="text-[9px] uppercase tracking-wider text-syn-text-muted font-ui">Output</span>
-                      <pre className="text-[11px] font-mono text-syn-text-code bg-syn-void p-2 rounded mt-1 overflow-x-auto">
-                        {JSON.stringify(result.output, null, 2)}
-                      </pre>
-                    </div>
-                  )}
+              {isOpen && result && (
+                <div className="mt-3 pt-3 border-t border-syn-border/50 space-y-2 text-[11px] font-mono text-syn-text-secondary">
+                  <div className="p-2 bg-syn-void/50 rounded truncate">
+                    {JSON.stringify(result.output).substring(0, 100)}...
+                  </div>
                   {result.error && (
-                    <div>
-                      <p className="text-xs font-mono text-syn-red mb-2">{result.error}</p>
-                      <button className="text-xs font-ui text-syn-violet border border-syn-violet/30 rounded px-3 py-1.5 hover:bg-syn-violet/10 transition-all">
-                        🔮 Suggest Fix
-                      </button>
+                    <div className="p-2 bg-syn-red/5 rounded text-syn-red">
+                      Error: {result.error}
                     </div>
                   )}
                 </div>
               )}
-            </div>
+            </button>
           );
         })}
       </div>
@@ -248,89 +369,43 @@ function DebuggerTab() {
   );
 }
 
-// --- Comments Tab ---
-function CommentsTab() {
-  const { comments, selectedNodeId } = useWorkflowStore();
-  const filtered = selectedNodeId
-    ? comments.filter((c) => c.nodeId === selectedNodeId)
-    : comments;
-
-  return (
-    <div className="h-full flex flex-col">
-      <div className="flex-1 overflow-y-auto p-3 space-y-3">
-        {filtered.length === 0 && (
-          <p className="text-xs text-syn-text-muted font-ui">No comments yet.</p>
-        )}
-        {filtered.map((c) => (
-          <div key={c.id} className="space-y-1.5">
-            <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-full bg-syn-teal/20 flex items-center justify-center text-[10px] font-bold text-syn-teal">
-                {c.userName.split(' ').map((n) => n[0]).join('')}
-              </div>
-              <span className="text-xs font-ui font-bold text-foreground">{c.userName}</span>
-              <span className="text-[10px] text-syn-text-muted">
-                {Math.round((Date.now() - c.timestamp.getTime()) / 60000)}m ago
-              </span>
-            </div>
-            <p className="text-[13px] font-ui text-foreground pl-9">{c.text}</p>
-            <div className="pl-9 flex gap-1">
-              {Object.entries(c.reactions).map(([emoji, users]) => (
-                <button key={emoji} className="text-xs px-1.5 py-0.5 rounded bg-syn-raised border border-syn-border hover:border-syn-border-active transition-all">
-                  {emoji} {users.length}
-                </button>
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
-      <div className="p-3 border-t border-syn-border">
-        <textarea
-          placeholder="Add a comment..."
-          rows={2}
-          className="w-full px-3 py-2 text-xs font-ui bg-syn-raised border border-syn-border rounded-md text-foreground placeholder:text-syn-text-muted resize-none focus:outline-none focus:border-syn-violet transition-all"
-        />
-      </div>
-    </div>
-  );
-}
-
-// --- Right Panel ---
 export default function RightPanel() {
-  const { activeRightTab, setActiveRightTab } = useUIStore();
+  const { rightPanelOpen } = useUIStore();
+  const [activeTab, setActiveTab] = useState<'inspector' | 'debugger'>('inspector');
 
-  const tabs = [
-    { id: 'inspector' as const, label: 'Inspector' },
-    { id: 'debugger' as const, label: 'AI Debugger' },
-    { id: 'comments' as const, label: 'Comments' },
-  ];
+  if (!rightPanelOpen) return null;
 
   return (
-    <div className="h-full bg-syn-surface flex flex-col overflow-hidden">
-      {/* Tab bar */}
-      <div className="h-11 flex items-center border-b border-syn-border relative">
-        {tabs.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveRightTab(tab.id)}
-            className={cn(
-              'flex-1 h-full text-xs font-ui transition-colors relative',
-              activeRightTab === tab.id ? 'text-foreground' : 'text-syn-text-muted hover:text-syn-text-secondary'
-            )}
-          >
-            {tab.label}
-            {activeRightTab === tab.id && (
-              <div className="absolute bottom-0 left-2 right-2 h-0.5 bg-syn-violet rounded-full transition-all duration-250" />
-            )}
-          </button>
-        ))}
+    <div className="w-80 bg-syn-surface border-l border-syn-border flex flex-col shrink-0">
+      {/* Tabs */}
+      <div className="h-10 border-b border-syn-border flex">
+        <button
+          onClick={() => setActiveTab('inspector')}
+          className={cn(
+            'flex-1 text-xs font-ui transition-all',
+            activeTab === 'inspector'
+              ? 'text-foreground border-b-2 border-syn-violet'
+              : 'text-syn-text-secondary hover:text-foreground'
+          )}
+        >
+          Inspector
+        </button>
+        <button
+          onClick={() => setActiveTab('debugger')}
+          className={cn(
+            'flex-1 text-xs font-ui transition-all',
+            activeTab === 'debugger'
+              ? 'text-foreground border-b-2 border-syn-violet'
+              : 'text-syn-text-secondary hover:text-foreground'
+          )}
+        >
+          AI Debugger
+        </button>
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-hidden">
-        {activeRightTab === 'inspector' && <InspectorTab />}
-        {activeRightTab === 'debugger' && <DebuggerTab />}
-        {activeRightTab === 'comments' && <CommentsTab />}
-      </div>
+      {activeTab === 'inspector' && <InspectorTab />}
+      {activeTab === 'debugger' && <DebuggerTab />}
     </div>
   );
 }
