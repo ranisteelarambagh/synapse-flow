@@ -2,9 +2,10 @@ import { useState, useRef, useEffect } from 'react';
 import { useWorkflowStore } from '@/stores/workflowStore';
 import { useUIStore } from '@/stores/uiStore';
 import { useCollaborationStore } from '@/stores/collaborationStore';
-import { Play, Square, Search, Share2, ChevronDown, User, Mic } from 'lucide-react';
+import { Play, Square, Search, Share2, ChevronDown, User, Mic, Download } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { exportJSON, exportLangGraph, downloadFile, shareWorkflow } from '@/lib/exportUtils';
 
 function SynapseLogo() {
   return (
@@ -31,13 +32,15 @@ function SynapseLogo() {
 }
 
 export default function Topbar() {
-  const { workspaceName, setWorkspaceName, unsavedChanges, isRunning, setIsRunning } = useWorkflowStore();
+  const { workspaceName, setWorkspaceName, unsavedChanges, isRunning, setIsRunning, nodes, edges } = useWorkflowStore();
   const { setCommandPaletteOpen } = useUIStore();
   const { collaborators } = useCollaborationStore();
 
   const [editing, setEditing] = useState(false);
   const [editValue, setEditValue] = useState(workspaceName);
   const [isRecording, setIsRecording] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
+  const [sharing, setSharing] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -72,6 +75,32 @@ export default function Topbar() {
   };
 
   const onlineCount = collaborators.length + 1;
+
+  const handleShare = async () => {
+    setSharing(true);
+    try {
+      const shareUrl = await shareWorkflow(selectedNodeId || 'default');
+      navigator.clipboard.writeText(shareUrl);
+      alert('Share link copied!');
+    } catch (error) {
+      console.error('Share failed:', error);
+      alert('Failed to generate share link');
+    } finally {
+      setSharing(false);
+    }
+  };
+
+  const handleExportJSON = () => {
+    const json = exportJSON(nodes as any, edges, workspaceName);
+    downloadFile(json, `${workspaceName}.json`, 'application/json');
+    setExportOpen(false);
+  };
+
+  const handleExportPython = () => {
+    const python = exportLangGraph(nodes as any, edges, workspaceName);
+    downloadFile(python, `${workspaceName}.py`, 'text/plain');
+    setExportOpen(false);
+  };
 
   return (
     <TooltipProvider delayDuration={300}>
@@ -180,15 +209,48 @@ export default function Topbar() {
             )}
           </button>
 
-          <button className="h-8 px-3 text-xs font-ui text-syn-text-secondary hover:bg-syn-hover rounded-md flex items-center gap-1.5 transition-all">
+          <button
+            onClick={handleShare}
+            disabled={sharing}
+            className="h-8 px-3 text-xs font-ui text-syn-text-secondary hover:bg-syn-hover rounded-md flex items-center gap-1.5 transition-all disabled:opacity-50"
+          >
             <Share2 className="w-3.5 h-3.5" />
-            Share
+            {sharing ? 'Sharing...' : 'Share'}
           </button>
 
-          <button className="h-8 px-3 text-xs font-ui text-syn-text-secondary hover:bg-syn-hover rounded-md flex items-center gap-1.5 transition-all">
-            Export
-            <ChevronDown className="w-3 h-3" />
-          </button>
+          <div className="relative">
+            <button
+              onClick={() => setExportOpen(!exportOpen)}
+              className="h-8 px-3 text-xs font-ui text-syn-text-secondary hover:bg-syn-hover rounded-md flex items-center gap-1.5 transition-all"
+            >
+              <Download className="w-3.5 h-3.5" />
+              Export
+              <ChevronDown className={cn('w-3 h-3 transition-transform', exportOpen && 'rotate-180')} />
+            </button>
+
+            {exportOpen && (
+              <>
+                <div
+                  className="fixed inset-0 z-30"
+                  onClick={() => setExportOpen(false)}
+                />
+                <div className="absolute top-full right-0 mt-1 z-40 bg-syn-raised border border-syn-border rounded-md shadow-lg min-w-40">
+                  <button
+                    onClick={handleExportJSON}
+                    className="w-full px-3 py-2 text-left text-xs font-ui text-syn-text-secondary hover:text-foreground hover:bg-syn-hover transition-all flex items-center gap-2"
+                  >
+                    <span>JSON</span>
+                  </button>
+                  <button
+                    onClick={handleExportPython}
+                    className="w-full px-3 py-2 text-left text-xs font-ui text-syn-text-secondary hover:text-foreground hover:bg-syn-hover transition-all flex items-center gap-2"
+                  >
+                    <span>Python</span>
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
 
           <div className="w-8 h-8 rounded-full bg-syn-violet/20 flex items-center justify-center">
             <User className="w-4 h-4 text-syn-violet" />
