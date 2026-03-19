@@ -16,13 +16,41 @@ import '@xyflow/react/dist/style.css';
 
 import SynapseNode from './SynapseNode';
 import { useWorkflowStore, type NodeData } from '@/stores/workflowStore';
+import { useCollaborationStore } from '@/stores/collaborationStore';
 import { mockNodes, mockEdges, mockExecutionResults } from '@/lib/mockData';
-import { NODE_TEMPLATES } from '@/lib/nodeTemplates';
+import { NODE_CONFIGS } from '@/lib/nodeConfigs';
+import { nanoid } from 'nanoid';
 
 const nodeTypes = { synapse: SynapseNode };
 
+function CollabCursors() {
+  const { collaborators } = useCollaborationStore();
+  return (
+    <>
+      {collaborators.filter(c => c.cursor).map(c => (
+        <div
+          key={c.id}
+          className="collab-cursor"
+          style={{ left: c.cursor!.x, top: c.cursor!.y }}
+        >
+          <svg width="16" height="20" viewBox="0 0 16 20" style={{ filter: `drop-shadow(0 1px 2px rgba(0,0,0,0.4))` }}>
+            <path d="M0 0 L0 16 L4 12 L8 20 L10 19 L6 11 L12 11 Z" fill={c.color} />
+          </svg>
+          <span
+            className="absolute top-4 left-3 px-1.5 py-0.5 rounded text-[10px] font-ui font-medium text-white whitespace-nowrap"
+            style={{ background: c.color }}
+          >
+            {c.name.split(' ')[0]}
+          </span>
+        </div>
+      ))}
+    </>
+  );
+}
+
 export default function Canvas() {
   const { setNodes: storeSetNodes, setEdges: storeSetEdges, selectNode, setExecutionResults } = useWorkflowStore();
+  const { updateCursor } = useCollaborationStore();
   const [nodes, setNodes, onNodesChange] = useNodesState(mockNodes as Node[]);
   const [edges, setEdges, onEdgesChange] = useEdgesState(mockEdges);
   const initialized = useRef(false);
@@ -37,17 +65,11 @@ export default function Canvas() {
     }
   }, []);
 
-  // Sync nodes/edges back to store on change
-  useEffect(() => {
-    storeSetNodes(nodes as Node<NodeData>[]);
-  }, [nodes]);
-
-  useEffect(() => {
-    storeSetEdges(edges);
-  }, [edges]);
+  useEffect(() => { storeSetNodes(nodes as Node<NodeData>[]); }, [nodes]);
+  useEffect(() => { storeSetEdges(edges); }, [edges]);
 
   const onConnect = useCallback(
-    (connection: Connection) => setEdges((eds) => addEdge({ ...connection, type: 'smoothstep' }, eds)),
+    (connection: Connection) => setEdges(eds => addEdge({ ...connection, type: 'smoothstep' }, eds)),
     [setEdges]
   );
 
@@ -55,9 +77,12 @@ export default function Canvas() {
     selectNode(node.id);
   }, [selectNode]);
 
-  const onPaneClick = useCallback(() => {
-    selectNode(null);
-  }, [selectNode]);
+  const onPaneClick = useCallback(() => { selectNode(null); }, [selectNode]);
+
+  const onMouseMove = useCallback((e: React.MouseEvent) => {
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    updateCursor(e.clientX - rect.left, e.clientY - rect.top);
+  }, [updateCursor]);
 
   const onDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -70,8 +95,8 @@ export default function Canvas() {
       const nodeType = e.dataTransfer.getData('application/synapse-node');
       if (!nodeType) return;
 
-      const template = NODE_TEMPLATES.find((t) => t.nodeType === nodeType);
-      if (!template) return;
+      const cfg = NODE_CONFIGS[nodeType];
+      if (!cfg) return;
 
       const reactFlowBounds = (e.target as HTMLElement).closest('.react-flow')?.getBoundingClientRect();
       if (!reactFlowBounds) return;
@@ -82,28 +107,28 @@ export default function Canvas() {
       };
 
       const newNode: Node<NodeData> = {
-        id: `${template.nodeType}-${Date.now()}`,
+        id: `${nodeType}-${nanoid(6)}`,
         type: 'synapse',
         position,
         data: {
-          label: template.label,
-          category: template.category,
-          nodeType: template.nodeType,
+          label: cfg.label,
+          category: cfg.category,
+          nodeType: cfg.type,
           status: 'idle',
-          icon: template.icon,
-          config: { ...template.defaultConfig },
-          inputs: template.inputs,
-          outputs: template.outputs,
+          icon: cfg.icon,
+          config: { ...cfg.defaultConfig },
+          inputs: cfg.inputs,
+          outputs: cfg.outputs,
         },
       };
 
-      setNodes((nds) => [...nds, newNode]);
+      setNodes(nds => [...nds, newNode]);
     },
     [setNodes]
   );
 
   return (
-    <div className="w-full h-full">
+    <div className="w-full h-full relative">
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -114,6 +139,7 @@ export default function Canvas() {
         onPaneClick={onPaneClick}
         onDragOver={onDragOver}
         onDrop={onDrop}
+        onMouseMove={onMouseMove}
         nodeTypes={nodeTypes}
         connectionLineType={ConnectionLineType.SmoothStep}
         fitView
@@ -146,6 +172,7 @@ export default function Canvas() {
           }}
         />
       </ReactFlow>
+      <CollabCursors />
     </div>
   );
 }

@@ -23,10 +23,17 @@ interface ExecutionStore {
   logs: LogEntry[];
   timeline: TimelineStep[];
   isStreaming: boolean;
+  nodeStatuses: Record<string, string>;
+  liveChunks: Record<string, string>;
+  runsRemaining: number;
+
   addLog: (log: LogEntry) => void;
   setTimeline: (t: TimelineStep[]) => void;
   setIsStreaming: (v: boolean) => void;
   clearLogs: () => void;
+  setLiveChunk: (nodeId: string, updater: string | null | ((prev: string) => string)) => void;
+  setRunsRemaining: (updater: number | ((prev: number) => number)) => void;
+  setNodeStatuses: (s: Record<string, string>) => void;
 }
 
 export const useExecutionStore = create<ExecutionStore>((set) => ({
@@ -41,12 +48,32 @@ export const useExecutionStore = create<ExecutionStore>((set) => ({
   timeline: [
     { nodeId: 'input-1', nodeName: 'Input', status: 'success', duration: 12, icon: '📥' },
     { nodeId: 'agent-1', nodeName: 'Agent', status: 'success', duration: 1840, icon: '🤖' },
-    { nodeId: 'http-1', nodeName: 'HTTP Request', status: 'error', duration: 5000, icon: '🔧' },
-    { nodeId: 'output-1', nodeName: 'Output', status: 'skipped', duration: 0, icon: '📥' },
+    { nodeId: 'http-1', nodeName: 'HTTP Request', status: 'error', duration: 5000, icon: '🌐' },
+    { nodeId: 'output-1', nodeName: 'Output', status: 'skipped', duration: 0, icon: '📤' },
   ],
   isStreaming: false,
-  addLog: (log) => set((s) => ({ logs: [...s.logs, log] })),
+  nodeStatuses: {},
+  liveChunks: {},
+  runsRemaining: 100,
+
+  addLog: (log) => set((s) => ({ logs: [...s.logs.slice(-200), log] })),
   setTimeline: (t) => set({ timeline: t }),
   setIsStreaming: (v) => set({ isStreaming: v }),
   clearLogs: () => set({ logs: [] }),
+  setLiveChunk: (nodeId, updater) =>
+    set((s) => ({
+      liveChunks: {
+        ...s.liveChunks,
+        [nodeId]: updater === null
+          ? ''
+          : typeof updater === 'function'
+            ? updater(s.liveChunks[nodeId] || '')
+            : updater,
+      },
+    })),
+  setRunsRemaining: (updater) =>
+    set((s) => ({
+      runsRemaining: typeof updater === 'function' ? updater(s.runsRemaining) : updater,
+    })),
+  setNodeStatuses: (s) => set({ nodeStatuses: s }),
 }));

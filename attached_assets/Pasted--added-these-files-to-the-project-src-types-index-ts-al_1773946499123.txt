@@ -1,0 +1,91 @@
+ added these files to the project:
+- src/types/index.ts — all TypeScript types
+- src/lib/api.ts — API client (authApi, workspaceApi, executeWorkflow, etc.)
+- src/lib/collaboration.ts — Socket.io + Yjs + PeerJS + Web Speech
+- src/lib/nodeConfigs.ts — node type definitions and field configs
+- src/lib/exportUtils.ts — JSON and LangGraph Python export
+- src/stores/store.ts — complete Zustand store with all slices
+- src/hooks/useAuth.ts — login/register/logout
+- src/hooks/useWorkspace.ts — workspace loading + collab + autosave
+- src/hooks/useExecution.ts — workflow execution with SSE
+- src/hooks/useVoice.ts — voice recording + node creation
+- src/hooks/useDebugger.ts — fix suggestions + hallucination scoring
+
+Please wire these into the existing UI components:
+
+1. AUTH: Replace any mock auth with useAuth hook.
+   - Login form → useAuth().login(email, password)
+   - Register form → useAuth().register(name, email, password)
+   - Logout → useAuth().logout()
+   - Show user name/plan in topbar from useAuth().user
+
+2. WORKSPACE: In the main canvas page component:
+   - Import and call useWorkspace(workspaceId) at the top
+   - Replace mock nodes/edges with useStore(s => s.nodes) and useStore(s => s.edges)
+   - Pass setNodes/setEdges from useStore to ReactFlow's onNodesChange/onEdgesChange
+   - Show isSaving indicator in topbar
+   - Show isDirty dot in topbar
+
+3. EXECUTION: Wire the Run button to useExecution:
+   - const { run, cancel, canRun } = useExecution(workspaceId)
+   - Run button onClick: show input modal, then call run(userInput)
+   - Cancel button onClick: cancel()
+   - Node visual states: read useStore(s => s.exec.nodeStatuses[nodeId]) for each node
+     - 'running' → animated shimmer border
+     - 'success' → brief green flash then idle
+     - 'error' → red border
+   - Bottom log panel: useStore(s => s.exec.logs)
+   - Live AI output: useStore(s => s.exec.liveChunks[nodeId])
+
+4. COLLABORATION: 
+   - Presence avatars in topbar: useStore(s => s.collaborators)
+   - Cursor overlays on canvas: useStore(s => s.cursors) — render each as colored arrow
+   - Report cursor position: useWorkspace().reportCursor(x, y) on canvas mousemove
+   - Report node selection: useWorkspace().reportNodeSelect(nodeId) on node click
+
+5. RIGHT PANEL — INSPECTOR TAB:
+   - Show fields from nodeConfigs.ts for selected node type
+   - NODE_CONFIGS[node.type].fields defines what inputs to render
+   - On field change: useStore().updateNode(id, { [field]: value })
+
+6. RIGHT PANEL — DEBUGGER TAB:
+   - const debugger = useDebugger()
+   - Show execution timeline from useStore(s => s.exec.nodeResults)
+   - "Suggest Fix" button on error nodes → debugger.requestFix(nodeId)
+   - Show streaming fix text: useStore(s => s.fixStreaming)
+   - Show parsed fix diff: useStore(s => s.fixSuggestion)
+   - "Apply Fix" → debugger.applyFix(nodeId, field, value)
+   - Hallucination score: debugger.scoreHallucination(nodeId)
+
+7. RIGHT PANEL — COMMENTS TAB:
+   - Load: useStore(s => s.comments).filter(c => c.nodeId === selectedNodeId)
+   - Create: commentsApi.create(workspaceId, content, nodeId)
+   - React: commentsApi.react(commentId, emoji)
+   - Delete: commentsApi.delete(commentId)
+
+8. VOICE BUTTON:
+   - const { startRecording, stopRecording } = useVoice(workspaceId)
+   - Hold → startRecording(), show interim transcript from useStore(s => s.voiceTranscript)
+   - Release → stopRecording()
+   - Disable if user.limits.voiceEnabled === false (show upgrade prompt)
+
+9. EXPORT:
+   - Import exportJSON, exportLangGraph, downloadFile from lib/exportUtils
+   - JSON: downloadFile(exportJSON(nodes, edges, name), 'workflow.json', 'application/json')
+   - Python: downloadFile(exportLangGraph(nodes, edges, name), 'workflow.py', 'text/plain')
+
+10. NODE LIBRARY (left panel):
+    - Import ORDERED_CATEGORIES, CATEGORY_META, NODE_CONFIGS from lib/nodeConfigs
+    - Render categories from ORDERED_CATEGORIES
+    - Each node in library: drag to canvas calls addNode(buildDefaultNode(type, dropPosition))
+
+11. PLAN LIMITS:
+    - If API returns status 402 with code NODE_LIMIT_REACHED → show upgrade modal
+    - Run button disabled if canRun === false
+    - Voice button disabled if !user.limits.voiceEnabled
+    - Video button disabled if !user.limits.videoEnabled
+    - Show runs remaining: useStore(s => s.exec.runsRemaining)
+
+12. TOASTS:
+    - Render useStore(s => s.toasts) as a stack in bottom-center
+    - Each toast: type-colored left border, message text, auto-dismiss

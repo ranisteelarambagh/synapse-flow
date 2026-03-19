@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { useParams } from 'react-router-dom';
 import Topbar from '@/components/workspace/Topbar';
 import Canvas from '@/components/workspace/Canvas';
 import LeftPanel from '@/components/workspace/LeftPanel';
@@ -6,16 +7,21 @@ import RightPanel from '@/components/workspace/RightPanel';
 import BottomPanel from '@/components/workspace/BottomPanel';
 import CommandPalette from '@/components/workspace/CommandPalette';
 import { useUIStore } from '@/stores/uiStore';
+import { useWorkspace } from '@/hooks/useWorkspace';
 import { cn } from '@/lib/utils';
 import { PanelLeftClose, PanelRightClose } from 'lucide-react';
 
 export default function WorkspacePage() {
+  const { id } = useParams<{ id: string }>();
+  const workspaceId = id || 'demo';
+
   const {
     leftPanelOpen, rightPanelOpen, bottomPanelOpen,
     toggleLeftPanel, toggleRightPanel, toggleBottomPanel,
   } = useUIStore();
 
-  // Keyboard shortcuts
+  useWorkspace(workspaceId);
+
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === '`' && !e.metaKey && !e.ctrlKey) {
@@ -52,7 +58,6 @@ export default function WorkspacePage() {
           <LeftPanel />
         </div>
 
-        {/* Toggle buttons */}
         {!leftPanelOpen && (
           <button
             onClick={toggleLeftPanel}
@@ -65,8 +70,6 @@ export default function WorkspacePage() {
         {/* Canvas */}
         <div className="flex-1 overflow-hidden relative">
           <Canvas />
-
-          {/* Panel collapse toggles on canvas edges */}
           {leftPanelOpen && (
             <button
               onClick={toggleLeftPanel}

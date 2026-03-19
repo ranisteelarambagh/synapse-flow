@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { Node, Edge } from '@xyflow/react';
+import { nanoid } from 'nanoid';
 
 export type NodeStatus = 'idle' | 'running' | 'success' | 'error';
 export type NodeCategory = 'ai' | 'tool' | 'logic' | 'io';
@@ -38,6 +39,20 @@ export interface Comment {
   replies?: Comment[];
 }
 
+export interface Toast {
+  id: string;
+  type: 'success' | 'error' | 'info' | 'warn';
+  message: string;
+  duration?: number;
+}
+
+export interface FixSuggestion {
+  nodeId: string;
+  field: string;
+  value: any;
+  explanation: string;
+}
+
 interface WorkflowStore {
   nodes: Node<NodeData>[];
   edges: Edge[];
@@ -48,6 +63,10 @@ interface WorkflowStore {
   comments: Comment[];
   workspaceName: string;
   workflowDescription: string;
+  toasts: Toast[];
+  voiceTranscript: string;
+  fixStreaming: boolean;
+  fixSuggestion: FixSuggestion | null;
 
   setNodes: (nodes: Node<NodeData>[]) => void;
   setEdges: (edges: Edge[]) => void;
@@ -59,7 +78,14 @@ interface WorkflowStore {
   setWorkspaceName: (name: string) => void;
   setWorkflowDescription: (desc: string) => void;
   addComment: (comment: Comment) => void;
+  removeComment: (id: string) => void;
+  addReaction: (commentId: string, emoji: string, userId: string) => void;
   updateNodeData: (nodeId: string, data: Partial<NodeData>) => void;
+  addToast: (toast: Omit<Toast, 'id'>) => void;
+  removeToast: (id: string) => void;
+  setVoiceTranscript: (text: string) => void;
+  setFixStreaming: (v: boolean) => void;
+  setFixSuggestion: (s: FixSuggestion | null) => void;
 }
 
 export const useWorkflowStore = create<WorkflowStore>((set) => ({
@@ -79,9 +105,22 @@ export const useWorkflowStore = create<WorkflowStore>((set) => ({
       timestamp: new Date(Date.now() - 4 * 60 * 1000),
       reactions: { '👍': ['alex', 'local-user'] },
     },
+    {
+      id: 'c2',
+      nodeId: 'agent-1',
+      userId: 'alex',
+      userName: 'Alex Rivera',
+      text: 'Good point! Also consider using a summary memory node before this.',
+      timestamp: new Date(Date.now() - 2 * 60 * 1000),
+      reactions: { '💡': ['maya'] },
+    },
   ],
   workspaceName: 'AI Research Pipeline',
   workflowDescription: '',
+  toasts: [],
+  voiceTranscript: '',
+  fixStreaming: false,
+  fixSuggestion: null,
 
   setNodes: (nodes) => set({ nodes, unsavedChanges: true }),
   setEdges: (edges) => set({ edges, unsavedChanges: true }),
@@ -98,6 +137,23 @@ export const useWorkflowStore = create<WorkflowStore>((set) => ({
   setWorkspaceName: (name) => set({ workspaceName: name, unsavedChanges: true }),
   setWorkflowDescription: (desc) => set({ workflowDescription: desc, unsavedChanges: true }),
   addComment: (comment) => set((state) => ({ comments: [...state.comments, comment] })),
+  removeComment: (id) => set((state) => ({ comments: state.comments.filter(c => c.id !== id) })),
+  addReaction: (commentId, emoji, userId) =>
+    set((state) => ({
+      comments: state.comments.map(c =>
+        c.id === commentId
+          ? {
+              ...c,
+              reactions: {
+                ...c.reactions,
+                [emoji]: c.reactions[emoji]?.includes(userId)
+                  ? c.reactions[emoji].filter(u => u !== userId)
+                  : [...(c.reactions[emoji] || []), userId],
+              },
+            }
+          : c
+      ),
+    })),
   updateNodeData: (nodeId, data) =>
     set((state) => ({
       nodes: state.nodes.map((n) =>
@@ -105,4 +161,17 @@ export const useWorkflowStore = create<WorkflowStore>((set) => ({
       ),
       unsavedChanges: true,
     })),
+  addToast: (toast) => {
+    const id = nanoid();
+    set((state) => ({
+      toasts: [...state.toasts.slice(-2), { ...toast, id, duration: toast.duration ?? 4000 }],
+    }));
+    setTimeout(() => {
+      set((state) => ({ toasts: state.toasts.filter(t => t.id !== id) }));
+    }, toast.duration ?? 4000);
+  },
+  removeToast: (id) => set((state) => ({ toasts: state.toasts.filter(t => t.id !== id) })),
+  setVoiceTranscript: (text) => set({ voiceTranscript: text }),
+  setFixStreaming: (v) => set({ fixStreaming: v }),
+  setFixSuggestion: (s) => set({ fixSuggestion: s }),
 }));
