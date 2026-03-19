@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useRef, useMemo } from 'react';
 import {
   ReactFlow,
   Background,
@@ -10,6 +10,7 @@ import {
   ConnectionLineType,
   type Connection,
   type Node,
+  type NodeDragHandler,
   BackgroundVariant,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
@@ -21,6 +22,7 @@ import { mockNodes, mockEdges, mockExecutionResults } from '@/lib/mockData';
 import { NODE_CONFIGS } from '@/lib/nodeConfigs';
 import { nanoid } from 'nanoid';
 
+// Defined at module level so the reference is stable across renders
 const nodeTypes = { synapse: SynapseNode };
 
 function CollabCursors() {
@@ -49,37 +51,69 @@ function CollabCursors() {
 }
 
 export default function Canvas() {
-  const { setNodes: storeSetNodes, setEdges: storeSetEdges, selectNode, setExecutionResults } = useWorkflowStore();
+  // The store is used for config/status lookups only — NOT for driving ReactFlow's node list
+  const {
+    selectNode,
+    setExecutionResults,
+    // Pull setNodes/setEdges only for explicit user actions (drop, connect, delete)
+    setNodes: storeSetNodes,
+    setEdges: storeSetEdges,
+  } = useWorkflowStore();
   const { updateCursor } = useCollaborationStore();
+
+  // ReactFlow manages its own internal state — this is the source of truth for the canvas
   const [nodes, setNodes, onNodesChange] = useNodesState(mockNodes as Node[]);
   const [edges, setEdges, onEdgesChange] = useEdgesState(mockEdges);
+
   const initialized = useRef(false);
 
+  // One-time initialization: seed the store so Inspector/Debugger know what nodes exist
   useEffect(() => {
-    if (!initialized.current) {
-      storeSetNodes(mockNodes);
-      storeSetEdges(mockEdges);
-      setExecutionResults(mockExecutionResults);
-      selectNode('agent-1');
-      initialized.current = true;
-    }
-  }, []);
+    if (initialized.current) return;
+    initialized.current = true;
+    // Push to store WITHOUT triggering unsavedChanges (use getState to bypass subscriber chain)
+    const { setNodes: sn, setEdges: se } = useWorkflowStore.getState();
+    // Temporarily override unsavedChanges after seeding
+    useWorkflowStore.setState({ nodes: mockNodes as Node<NodeData>[], edges: mockEdges, unsavedChanges: false });
+    setExecutionResults(mockExecutionResults);
+    selectNode('agent-1');
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => { storeSetNodes(nodes as Node<NodeData>[]); }, [nodes]);
-  useEffect(() => { storeSetEdges(edges); }, [edges]);
+  // ── Explicit user-action handlers (these update the store intentionally) ──
 
   const onConnect = useCallback(
-    (connection: Connection) => setEdges(eds => addEdge({ ...connection, type: 'smoothstep' }, eds)),
-    [setEdges]
+    (connection: Connection) => {
+      setEdges(eds => {
+        const next = addEdge({ ...connection, type: 'smoothstep' }, eds);
+        storeSetEdges(next);
+        return next;
+      });
+    },
+    [setEdges, storeSetEdges]
+  );
+
+  const onNodeDragStop: NodeDragHandler = useCallback(
+    (_event, _node, allNodes) => {
+      // Only update positions in the store after drag ends (not on every move)
+      storeSetNodes(allNodes as Node<NodeData>[]);
+    },
+    [storeSetNodes]
   );
 
   const onNodeClick = useCallback((_: any, node: Node) => {
     selectNode(node.id);
   }, [selectNode]);
 
-  const onPaneClick = useCallback(() => { selectNode(null); }, [selectNode]);
+  const onPaneClick = useCallback(() => {
+    selectNode(null);
+  }, [selectNode]);
 
+  // Throttled cursor update — avoids Zustand churn on every mousemove
+  const lastCursorUpdate = useRef(0);
   const onMouseMove = useCallback((e: React.MouseEvent) => {
+    const now = Date.now();
+    if (now - lastCursorUpdate.current < 50) return; // 20fps max
+    lastCursorUpdate.current = now;
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
     updateCursor(e.clientX - rect.left, e.clientY - rect.top);
   }, [updateCursor]);
@@ -98,12 +132,13 @@ export default function Canvas() {
       const cfg = NODE_CONFIGS[nodeType];
       if (!cfg) return;
 
-      const reactFlowBounds = (e.target as HTMLElement).closest('.react-flow')?.getBoundingClientRect();
-      if (!reactFlowBounds) return;
+      const reactFlowEl = (e.target as HTMLElement).closest('.react-flow');
+      if (!reactFlowEl) return;
+      const bounds = reactFlowEl.getBoundingClientRect();
 
       const position = {
-        x: e.clientX - reactFlowBounds.left - 110,
-        y: e.clientY - reactFlowBounds.top - 30,
+        x: e.clientX - bounds.left - 110,
+        y: e.clientY - bounds.top - 30,
       };
 
       const newNode: Node<NodeData> = {
@@ -122,10 +157,25 @@ export default function Canvas() {
         },
       };
 
-      setNodes(nds => [...nds, newNode]);
+      setNodes(nds => {
+        const next = [...nds, newNode];
+        storeSetNodes(next as Node<NodeData>[]);
+        return next;
+      });
     },
-    [setNodes]
+    [setNodes, storeSetNodes]
   );
+
+  const miniMapNodeColor = useCallback((node: Node) => {
+    const d = node.data as unknown as NodeData;
+    const map: Record<string, string> = {
+      ai: 'hsl(244 100% 69%)',
+      tool: 'hsl(165 100% 42%)',
+      logic: 'hsl(43 100% 50%)',
+      io: 'hsl(354 100% 64%)',
+    };
+    return map[d?.category] || '#666';
+  }, []);
 
   return (
     <div className="w-full h-full relative">
@@ -136,6 +186,7 @@ export default function Canvas() {
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         onNodeClick={onNodeClick}
+        onNodeDragStop={onNodeDragStop}
         onPaneClick={onPaneClick}
         onDragOver={onDragOver}
         onDrop={onDrop}
@@ -160,16 +211,7 @@ export default function Canvas() {
         <MiniMap
           className="!bg-syn-raised !border !border-syn-border !rounded-lg"
           maskColor="hsla(228, 27%, 4%, 0.8)"
-          nodeColor={(node: Node) => {
-            const d = node.data as unknown as NodeData;
-            const map: Record<string, string> = {
-              ai: 'hsl(244 100% 69%)',
-              tool: 'hsl(165 100% 42%)',
-              logic: 'hsl(43 100% 50%)',
-              io: 'hsl(354 100% 64%)',
-            };
-            return map[d?.category] || '#666';
-          }}
+          nodeColor={miniMapNodeColor}
         />
       </ReactFlow>
       <CollabCursors />
