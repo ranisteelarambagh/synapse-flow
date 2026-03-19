@@ -1,12 +1,46 @@
 import { useState, useRef, useCallback } from 'react';
 import { useWorkflowStore } from '@/stores/workflowStore';
+import { useCanvasApiStore } from '@/stores/canvasApiStore';
 import { startVoiceRecording } from '@/lib/collaboration';
+import { NODE_CONFIGS } from '@/lib/nodeConfigs';
 import { nanoid } from 'nanoid';
+import type { Node } from '@xyflow/react';
+import type { NodeData } from '@/stores/workflowStore';
 
-export function useVoice(workspaceId: string) {
+const VOICE_NODE_MAP: Record<string, string> = {
+  'agent': 'agent',
+  'ai agent': 'agent',
+  'llm': 'llm-call',
+  'language model': 'llm-call',
+  'gpt': 'llm-call',
+  'memory': 'memory',
+  'http': 'http-request',
+  'api call': 'http-request',
+  'fetch': 'http-request',
+  'request': 'http-request',
+  'input': 'input',
+  'trigger': 'input',
+  'webhook': 'input',
+  'output': 'output',
+  'result': 'output',
+  'router': 'router',
+  'branch': 'router',
+  'if': 'router',
+  'loop': 'loop',
+  'iterate': 'loop',
+  'code': 'code-runner',
+  'script': 'code-runner',
+  'python': 'code-runner',
+  'embed': 'embedder',
+  'embedder': 'embedder',
+  'classify': 'classifier',
+  'classifier': 'classifier',
+};
+
+export function useVoice(_workspaceId: string) {
   const [isRecording, setIsRecording] = useState(false);
   const stopRef = useRef<(() => void) | null>(null);
-  const { setVoiceTranscript, voiceTranscript, nodes, setNodes, addToast } = useWorkflowStore();
+  const { setVoiceTranscript, voiceTranscript, addToast } = useWorkflowStore();
 
   const startRecording = useCallback(() => {
     setIsRecording(true);
@@ -14,39 +48,40 @@ export function useVoice(workspaceId: string) {
 
     const stop = startVoiceRecording((text, isFinal) => {
       setVoiceTranscript(text);
+
       if (isFinal) {
         const lower = text.toLowerCase();
-        const nodeKeywords: Record<string, string> = {
-          'agent': 'agent', 'ai agent': 'agent',
-          'llm': 'llm-call', 'language model': 'llm-call',
-          'memory': 'memory',
-          'http': 'http-request', 'api call': 'http-request', 'fetch': 'http-request',
-          'input': 'input',
-          'output': 'output',
-          'router': 'router', 'branch': 'router',
-          'loop': 'loop',
-          'code': 'code-runner', 'script': 'code-runner',
-        };
 
-        for (const [kw, type] of Object.entries(nodeKeywords)) {
+        for (const [kw, type] of Object.entries(VOICE_NODE_MAP)) {
           if (lower.includes(kw)) {
-            const newNode = {
+            const cfg = NODE_CONFIGS[type];
+            const newNode: Node<NodeData> = {
               id: `${type}-${nanoid(6)}`,
-              type: 'synapse' as const,
-              position: { x: Math.random() * 400 + 100, y: Math.random() * 300 + 100 },
+              type: 'synapse',
+              position: {
+                x: 150 + Math.random() * 350,
+                y: 100 + Math.random() * 250,
+              },
               data: {
-                label: type.charAt(0).toUpperCase() + type.slice(1),
-                category: 'ai' as const,
+                label: cfg?.label || type,
+                category: cfg?.category || 'ai',
                 nodeType: type,
-                status: 'idle' as const,
-                icon: '🤖',
-                config: {},
-                inputs: ['input'],
-                outputs: ['output'],
+                status: 'idle',
+                icon: cfg?.icon || '🤖',
+                config: cfg ? { ...cfg.defaultConfig } : {},
+                inputs: cfg?.inputs || ['input'],
+                outputs: cfg?.outputs || ['output'],
               },
             };
-            setNodes([...nodes, newNode as any]);
-            addToast({ type: 'success', message: `Created ${type} node from voice command!` });
+
+            // Imperatively add to canvas via the canvas API bus — no store sync loop
+            const canvasAddNode = useCanvasApiStore.getState().addNode;
+            if (canvasAddNode) {
+              canvasAddNode(newNode);
+              addToast({ type: 'success', message: `🎤 Created "${cfg?.label || type}" from voice` });
+            } else {
+              addToast({ type: 'warn', message: 'Canvas not ready — try again' });
+            }
             break;
           }
         }
@@ -54,7 +89,7 @@ export function useVoice(workspaceId: string) {
     });
 
     stopRef.current = stop;
-  }, [nodes, setNodes, setVoiceTranscript, addToast]);
+  }, [setVoiceTranscript, addToast]);
 
   const stopRecording = useCallback(() => {
     setIsRecording(false);
