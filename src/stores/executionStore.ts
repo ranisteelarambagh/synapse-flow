@@ -22,10 +22,12 @@ export interface TimelineStep {
 interface ExecutionStore {
   logs: LogEntry[];
   timeline: TimelineStep[];
+  executionTimeline: TimelineStep[];  // alias for timeline
   isStreaming: boolean;
   nodeStatuses: Record<string, string>;
   liveChunks: Record<string, string>;
   runsRemaining: number;
+  lastRunDuration: number | null;
 
   addLog: (log: LogEntry) => void;
   setTimeline: (t: TimelineStep[]) => void;
@@ -34,7 +36,15 @@ interface ExecutionStore {
   setLiveChunk: (nodeId: string, updater: string | null | ((prev: string) => string)) => void;
   setRunsRemaining: (updater: number | ((prev: number) => number)) => void;
   setNodeStatuses: (s: Record<string, string>) => void;
+  setLastRunDuration: (ms: number | null) => void;
 }
+
+const defaultTimeline: TimelineStep[] = [
+  { nodeId: 'input-1', nodeName: 'Input', status: 'success', duration: 12, icon: '📥' },
+  { nodeId: 'agent-1', nodeName: 'Agent', status: 'success', duration: 1840, icon: '🤖' },
+  { nodeId: 'http-1', nodeName: 'HTTP Request', status: 'error', duration: 5000, icon: '🌐' },
+  { nodeId: 'output-1', nodeName: 'Output', status: 'skipped', duration: 0, icon: '📤' },
+];
 
 export const useExecutionStore = create<ExecutionStore>((set) => ({
   logs: [
@@ -45,19 +55,16 @@ export const useExecutionStore = create<ExecutionStore>((set) => ({
     { id: '5', timestamp: new Date(Date.now() - 1000), level: 'ERROR', nodeName: 'HTTP Request', message: 'Connection timeout after 5000ms — https://api.example.com/enrich' },
     { id: '6', timestamp: new Date(Date.now() - 800), level: 'WARN', nodeName: 'Output', message: 'Skipped — upstream node failed' },
   ],
-  timeline: [
-    { nodeId: 'input-1', nodeName: 'Input', status: 'success', duration: 12, icon: '📥' },
-    { nodeId: 'agent-1', nodeName: 'Agent', status: 'success', duration: 1840, icon: '🤖' },
-    { nodeId: 'http-1', nodeName: 'HTTP Request', status: 'error', duration: 5000, icon: '🌐' },
-    { nodeId: 'output-1', nodeName: 'Output', status: 'skipped', duration: 0, icon: '📤' },
-  ],
+  timeline: defaultTimeline,
+  executionTimeline: defaultTimeline,
   isStreaming: false,
   nodeStatuses: {},
   liveChunks: {},
   runsRemaining: 100,
+  lastRunDuration: 6852,
 
   addLog: (log) => set((s) => ({ logs: [...s.logs.slice(-200), log] })),
-  setTimeline: (t) => set({ timeline: t }),
+  setTimeline: (t) => set({ timeline: t, executionTimeline: t }),
   setIsStreaming: (v) => set({ isStreaming: v }),
   clearLogs: () => set({ logs: [] }),
   setLiveChunk: (nodeId, updater) =>
@@ -76,4 +83,5 @@ export const useExecutionStore = create<ExecutionStore>((set) => ({
       runsRemaining: typeof updater === 'function' ? updater(s.runsRemaining) : updater,
     })),
   setNodeStatuses: (s) => set({ nodeStatuses: s }),
+  setLastRunDuration: (ms) => set({ lastRunDuration: ms }),
 }));

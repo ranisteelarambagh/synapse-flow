@@ -32,6 +32,12 @@ Synapse is a visual AI workflow builder that lets users construct, run, and debu
 8. **Collaboration Cursors** — colored arrows on canvas with collaborator names
 9. **Toast Stack** — max 3 visible, auto-dismiss, type-colored
 10. **Inspector** — dynamic field rendering driven by NODE_CONFIGS (15 node types)
+11. **Stats Bar** — live node counts by category, connection count, last run time, success/error counts
+12. **Keyboard Shortcuts Panel** — press `?` to open full shortcut reference
+13. **Responsive Layout** — desktop: three-panel; tablet: collapsible; mobile: full-screen canvas + slide-in drawers + bottom tab nav
+14. **Mobile Bottom Nav** — Nodes / Canvas / Inspector / Terminal tabs for mobile
+15. **Glass Topbar** — frosted glass effect with responsive collapse and mobile dropdown menu
+16. **Command Palette** — grouped node/action results, recent nodes, keyboard navigation
 
 ## Running the App
 ```

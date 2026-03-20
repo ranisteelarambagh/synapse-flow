@@ -357,3 +357,63 @@ textarea:focus {
   background-clip: text;
   animation: gradient-shift 3s ease infinite;
 }
+
+/* ─── Glass card ─── */
+.glass-card {
+  background: rgba(255,255,255,0.03);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255,255,255,0.07);
+}
+
+/* ─── Gradient border ─── */
+.gradient-border {
+  position: relative;
+}
+.gradient-border::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(135deg, hsl(var(--violet)), hsl(var(--teal)));
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+/* ─── Scrollbar hide ─── */
+.scrollbar-hide { scrollbar-width: none; }
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+
+/* ─── Mobile safe area ─── */
+@supports (padding: env(safe-area-inset-bottom)) {
+  .mobile-safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+/* ─── Responsive ReactFlow container ─── */
+.react-flow__renderer,
+.react-flow__container {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* ─── Stats bar gutter ─── */
+@media (max-width: 640px) {
+  body { overflow: hidden; }
+}
+
+/* ─── Node card premium shadow ─── */
+.react-flow__node:hover {
+  filter: drop-shadow(0 16px 32px rgba(0,0,0,0.5)) drop-shadow(0 0 12px rgba(108,99,255,0.15));
+}
+
+/* ─── Execution timeline status ─── */
+@keyframes timeline-in {
+  from { transform: scaleX(0); transform-origin: left; }
+  to   { transform: scaleX(1); transform-origin: left; }
+}
+.animate-timeline-in { animation: timeline-in 600ms cubic-bezier(0.16,1,0.32,1) forwards; }
