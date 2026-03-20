@@ -81,6 +81,9 @@ interface WorkflowStore {
   removeComment: (id: string) => void;
   addReaction: (commentId: string, emoji: string, userId: string) => void;
   updateNodeData: (nodeId: string, data: Partial<NodeData>) => void;
+  removeNode: (nodeId: string) => void;
+  duplicateNode: (nodeId: string) => void;
+  disconnectNode: (nodeId: string) => void;
   addToast: (toast: Omit<Toast, 'id'>) => void;
   removeToast: (id: string) => void;
   setVoiceTranscript: (text: string) => void;
@@ -174,4 +177,34 @@ export const useWorkflowStore = create<WorkflowStore>((set) => ({
   setVoiceTranscript: (text) => set({ voiceTranscript: text }),
   setFixStreaming: (v) => set({ fixStreaming: v }),
   setFixSuggestion: (s) => set({ fixSuggestion: s }),
+  removeNode: (nodeId) =>
+    set((state) => ({
+      nodes: state.nodes.filter((n) => n.id !== nodeId),
+      edges: state.edges.filter((e) => e.source !== nodeId && e.target !== nodeId),
+      selectedNodeId: state.selectedNodeId === nodeId ? null : state.selectedNodeId,
+      unsavedChanges: true,
+    })),
+  duplicateNode: (nodeId) =>
+    set((state) => {
+      const node = state.nodes.find((n) => n.id === nodeId);
+      if (!node) return state;
+      const newId = `${node.id}-copy-${nanoid(4)}`;
+      const newNode = {
+        ...node,
+        id: newId,
+        position: { x: node.position.x + 40, y: node.position.y + 40 },
+        selected: false,
+        data: { ...node.data },
+      };
+      return {
+        nodes: [...state.nodes, newNode],
+        selectedNodeId: newId,
+        unsavedChanges: true,
+      };
+    }),
+  disconnectNode: (nodeId) =>
+    set((state) => ({
+      edges: state.edges.filter((e) => e.source !== nodeId && e.target !== nodeId),
+      unsavedChanges: true,
+    })),
 }));
